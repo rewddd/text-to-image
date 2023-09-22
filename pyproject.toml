@@ -3,11 +3,11 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "registry"
-description = "Fal's model registry"
+name = "text-to-image"
+description = "A general-purpose Text to Image API built with Fal Serverless"
 readme = "README.md"
 dependencies = [
-    "fal==0.10.8",
+    "fal>=0.10.9",
     "pydantic<2.0,>=1.8",
 ]
 version = "0.1.0"
