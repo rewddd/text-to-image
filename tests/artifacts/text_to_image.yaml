@@ -118,22 +118,3 @@
     images:
       - 3575d6c4a0c4054237dd775e6bfb0933fc92141f1c22e601883bbc6a45fd885c
     seed: 803613448
-
-- name: Playground Atmospheric Scene
-  input:
-    model_name: https://civitai.com/api/download/models/46846
-    prompt: (masterpiece), (best quality), (incredible digital artwork), atmospheric scene inspired by a Peter Jackson fantasy movie, breathtaking landscape, towering mountains, lush forests, misty valleys, awe-inspiring structures, diverse and vibrant characters, engaging in a pivotal moment, dramatic lighting, vivid colors, intricate details, expertly capturing the essence of an epic cinematic experience <lora:epiNoiseoffset_v2Pynoise:1>
-    seed: 2510945799
-    image_size:
-      width: 768
-      height: 512
-    clip_skip: 2
-    num_inference_steps: 90
-    guidance_scale: 8
-    negative_prompt: (worst quality:1.2), (low quality:1.2), (lowres:1.1), (monochrome:1.1), (greyscale), multiple views, comic, sketch, (((bad anatomy))), (((deformed))), (((disfigured))), watermark, multiple_views, mutation hands, mutation fingers, extra fingers, missing fingers, watermark
-    num_images: 1
-
-  output:
-    images:
-      - 375aa8222e5b8cf40e32da9dc279a1b56fbc01a626e6885ea0c732e72f275806
-    seed: 2510945799
