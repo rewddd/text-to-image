@@ -1,4 +1,4 @@
-from registry.text_to_image import LoraWeight, TextToImageInput, generate_image
+from text_to_image import InputParameters, LoraWeight, generate_image
 
 from .helpers import BaseModelTest, ModelTestParamType
 
@@ -13,7 +13,7 @@ class TestTextToImage(BaseModelTest):
         for lora in loras:
             input["loras"].append(LoraWeight(**lora))
 
-        model_input = TextToImageInput(**input)
+        model_input = InputParameters(**input)
 
         local = generate_image.on(
             serve=False,
