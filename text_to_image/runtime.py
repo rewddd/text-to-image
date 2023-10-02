@@ -78,7 +78,7 @@ class LoraWeight(BaseModel):
 
 @dataclass
 class GlobalRuntime:
-    MAX_CAPACITY: ClassVar[int] = 5
+    MAX_CAPACITY: ClassVar[int] = 3
 
     models: dict[tuple[str, ...], Model] = field(default_factory=dict)
     executor: ThreadPoolExecutor = field(default_factory=ThreadPoolExecutor)
