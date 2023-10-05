@@ -24,3 +24,28 @@ If you want to just try this app from our simple UI, go to [fal.ai's model playg
 To deploy this application on fal on your own, check out the [fal docs](https://fal.ai/docs)!
 
 Join our [Discord community](https://discord.com/invite/Fyc9PwrccF) and help us shape the direction of this project!
+
+## Examples
+
+You can start using the text-to-image service immediately by signing into [fal.ai](https://fal.ai) and downloading `fal` package
+from PyPI!
+
+```console
+$ pip install fal
+```
+
+```console
+$ fal auth login
+```
+
+Once you signed in, you are ready to use the text-to-image service!
+
+```python
+import fal
+
+result = fal.apps.run("110602490-lora", arguments={
+    "model_name": "stabilityai/stable-diffusion-xl-base-1.0",
+    "prompt": "a cute cat",
+})
+print(result["images"][0]["url"])
+```
