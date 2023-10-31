@@ -180,7 +180,7 @@ def wrap_excs():
     machine_type="GPU",
     keep_alive=4000,
     serve=True,
-    max_concurrency=20,
+    max_concurrency=30,
     _scheduler="nomad",
 )
 def generate_image(input: InputParameters) -> OutputParameters:
