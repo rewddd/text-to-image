@@ -1,13 +1,14 @@
+import gc
 import os
 import time
 import traceback
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, Literal
 
 from fal.toolkit import Image
 from fal.toolkit.file import FileRepository
@@ -19,6 +20,8 @@ from text_to_image.loras import (
     identify_lora_weights,
     stack_loras,
 )
+
+DeviceType = Literal["cpu", "cuda"]
 
 CHECKPOINTS_DIR = Path("/data/checkpoints")
 LORA_WEIGHTS_DIR = Path("/data/loras")
@@ -44,6 +47,9 @@ SUPPORTED_SCHEDULERS = {
     "Euler A": ("EulerAncestralDiscreteScheduler", {}),
 }
 
+# Amount of RAM to use as buffer, in percentages.
+RAM_BUFFER_PERCENTAGE = 1 - 0.75
+
 
 @dataclass
 class Model:
@@ -55,6 +61,9 @@ class Model:
 
         pipe = self.pipeline
         return pipe
+
+    def device(self) -> DeviceType:
+        return self.pipeline.device.type
 
 
 class LoraWeight(BaseModel):
@@ -78,8 +87,6 @@ class LoraWeight(BaseModel):
 
 @dataclass
 class GlobalRuntime:
-    MAX_CAPACITY: ClassVar[int] = 3
-
     models: dict[tuple[str, ...], Model] = field(default_factory=dict)
     executor: ThreadPoolExecutor = field(default_factory=ThreadPoolExecutor)
     repository: str | FileRepository = "fal"
@@ -223,13 +230,6 @@ class GlobalRuntime:
 
         model_key = (model_name, arch)
         if model_key not in self.models:
-            # Maybe in the future we can offload the model to the disk.
-            if len(self.models) >= self.MAX_CAPACITY:
-                by_last_hit = lambda kv: kv[1].last_cache_hit
-                oldest_model_key, _ = min(self.models.items(), key=by_last_hit)
-                print("Unloading model:", oldest_model_key)
-                del self.models[oldest_model_key]
-
             if model_name.endswith(".ckpt") or model_name.endswith(".safetensors"):
                 if arch is None:
                     if "xl" in model_name.lower():
@@ -259,7 +259,7 @@ class GlobalRuntime:
                 pipe.watermark = None
 
             pipe.enable_xformers_memory_efficient_attention()
-            pipe = pipe.to("cuda")
+
             self.models[model_key] = Model(pipe)
 
         return self.models[model_key]
@@ -286,6 +286,7 @@ class GlobalRuntime:
 
         model = self.get_model(model_name, arch=arch)
         pipe = model.as_base()
+        pipe = self.execute_on_cuda(partial(pipe.to, "cuda"))
 
         if clip_skip:
             print(f"Ignoring clip_skip={clip_skip} for now, it's not supported yet!")
@@ -346,3 +347,92 @@ class GlobalRuntime:
         res = list(self.executor.map(image_uploader, images))
         print("Done uploading images.")
         return res
+
+    def execute_on_cuda(
+        self,
+        function: Callable[..., Any],
+        *,
+        ignored_models: list[object] | None = None,
+    ):
+        cached_models = self.get_loaded_models_by_device(
+            "cuda",
+            ignored_models=ignored_models or [],
+        )
+
+        first_try = True
+        while first_try or cached_models:
+            first_try = False
+
+            try:
+                return function()
+            except RuntimeError as error:
+                # Only retry if the error is a CUDA OOM error.
+                # https://github.com/facebookresearch/detectron2/blob/main/detectron2/utils/memory.py#L19
+                __cuda_oom_errors = [
+                    "CUDA out of memory",
+                    "INTERNAL ASSERT FAILED",
+                ]
+                if (
+                    not any(error_str in str(error) for error_str in __cuda_oom_errors)
+                    or not cached_models
+                ):
+                    raise
+
+                # Since cached_models is sorted by last cache hit, we'll pop the the
+                # model with the oldest cache hit and try again.
+                target_model_id = cached_models.pop()
+                self.offload_model_to_cpu(target_model_id)
+                self.empty_cache()
+
+        self.empty_cache()
+        raise RuntimeError("Not enough CUDA memory to complete the operation.")
+
+    def get_loaded_models_by_device(
+        self,
+        device: DeviceType,
+        ignored_models: list[object],
+    ):
+        models = [
+            model_id
+            for model_id in self.models
+            if self.models[model_id].device() == device
+            if self.models[model_id].pipeline not in ignored_models
+        ]
+        models.sort(key=lambda model_id: self.models[model_id].last_cache_hit)
+        return models
+
+    def offload_model_to_cpu(self, model_id: tuple[str, ...]):
+        print(f"Offloading model={model_id} to CPU.")
+
+        def is_ram_buffer_full():
+            import psutil
+
+            memory = psutil.virtual_memory()
+            percent_available = memory.available / memory.total
+            return percent_available < RAM_BUFFER_PERCENTAGE
+
+        models = self.get_loaded_models_by_device("cpu", ignored_models=[])
+        while is_ram_buffer_full():
+            if not models:
+                print(
+                    f"Not enough RAM to offload the model to CPU, evicting {model_id}"
+                    "it directly."
+                )
+                del self.models[model_id]
+                gc.collect()
+                return
+
+            lru_model_id = models.pop()
+            print(f"Offloading model={lru_model_id} back to disk.")
+            del self.models[lru_model_id]
+            gc.collect()
+
+        model = self.models[model_id]
+        model.pipeline = model.pipeline.to("cpu")
+
+    def empty_cache(self):
+        import torch
+
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
