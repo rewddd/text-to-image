@@ -256,8 +256,6 @@ class GlobalRuntime:
             if hasattr(pipe, "watermark"):
                 pipe.watermark = None
 
-            pipe.enable_xformers_memory_efficient_attention()
-
             self.models[model_key] = Model(pipe)
 
         return self.models[model_key]
