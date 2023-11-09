@@ -185,8 +185,8 @@ def wrap_excs():
 )
 def generate_image(input: InputParameters) -> OutputParameters:
     """
-    TODO: write in markdown format 1-2 paragraphs about this function implementation
-    that might be relevant to the user (i.e. what makes it fast, lora support / formats, etc)
+    A single API for text-to-image, built on [fal](https://fal.ai) that supports
+    all Stable Diffusion variants, checkpoints and LoRAs from HuggingFace (🤗) and CivitAI.
     """
     import torch
 
