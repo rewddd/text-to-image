@@ -178,10 +178,16 @@ def wrap_excs():
         "psutil",
     ],
     machine_type="GPU",
-    keep_alive=4000,
+    keep_alive=1800,
     serve=True,
-    max_concurrency=30,
+    max_concurrency=5,
     _scheduler="nomad",
+    _scheduler_options={
+        "preferred_dcs": [
+            "datacrunch-fin-01-1",
+            "datacrunch-fin-01-bm",
+        ],
+    },
 )
 def generate_image(input: InputParameters) -> OutputParameters:
     """
